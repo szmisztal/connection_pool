@@ -1,30 +1,39 @@
 import psycopg2
+from threading import Lock
+from test_variables import user, password, host, port, database_name
 
 
-connections_list = []
-min_number_of_pools = 10
-max_number_of_pools = 100
+class ConnectionPool:
+    def __init__(self, min_numbers_of_conns, max_number_of_cons):
+        self.database = self.connection_to_db(
+            user = user,
+            password = password,
+            host = host,
+            port = port,
+            database_name = database_name
+            )
+        self.connections_list = []
+        self.connections_in_use = []
+        self.lock = Lock()
+        self.min_number_of_conns = min_numbers_of_conns
+        self.max_number_of_conns = max_number_of_cons
 
-def connection_to_db(user, password, host, port, database):
-    connection = psycopg2.connect(
-        user = user,
-        password = password,
-        host = host,
-        port = port,
-        database = database
-    )
-    return connection
+    def connection_to_db(self, user, password, host, port, database_name):
+        self.lock.acquire()
+        self.connection = psycopg2.connect(
+            user = user,
+            password = password,
+            host = host,
+            port = port,
+            database = database_name
+        )
+        self.lock.release()
+        return self.connection
 
-def create_connections_pool_with_app_start(number_of_pools, **kwargs):
-    for _ in range(number_of_pools):
-        connection = connection_to_db(**kwargs)
-        connections_list.append(connection)
-        if len(connections_list) >= min_number_of_pools:
-            break
+    def create_start_connections(self):
+        self.lock.acquire()
+        for _ in range(self.min_number_of_conns):
+            connection = self.database
+            self.connections_list.append([connection, True])
+        self.lock.release()
 
-def check_number_of_active_connections(connections_list):
-    if len(connections_list) < min_number_of_pools:
-        static_number_of_pools = min_number_of_pools - len(connections_list)
-        create_connections_pool_with_app_start(static_number_of_pools)
-    elif len(connections_list) >= max_number_of_pools:
-        print("Connections list full, try again later")
