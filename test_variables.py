@@ -1,5 +1,6 @@
 from secrets import password
 
+
 user = "postgres"
 password = password
 host = "127.0.0.1"
