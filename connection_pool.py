@@ -3,6 +3,17 @@ import schedule
 from threading import Lock
 from test_variables import user, password, host, port, database_name
 
+class Connection:
+    def __init__(self):
+        self.connection = psycopg2.connect(
+            user = user,
+            password = password,
+            host = host,
+            port = port,
+            database = database_name
+        )
+        self.cursor = self.connection.cursor()
+        self.in_use = False
 
 class ConnectionPool:
     def __init__(self, min_numbers_of_connections, max_number_of_connections):
@@ -11,40 +22,27 @@ class ConnectionPool:
         self.lock = Lock()
         self.min_number_of_connections = min_numbers_of_connections
         self.max_number_of_connections = max_number_of_connections
-        self.user = user
-        self.password = password
-        self.host = host
-        self.port = port
-        self.database_name = database_name
         self.create_start_connections()
         self.connections_manager()
 
-    def connection_to_db(self):
-        self.connection = psycopg2.connect(
-            user = self.user,
-            password = self.password,
-            host = self.host,
-            port = self.port,
-            database = self.database_name
-        )
-        return self.connection
-
     def create_start_connections(self):
         for _ in range(self.min_number_of_connections):
-            connection = self.connection_to_db()
-            self.connections_list.append([connection, True])
+            connection = Connection()
+            self.connections_list.append(connection)
 
     def get_connection(self):
         self.lock.acquire()
         try:
-            for connection, is_free in self.connections_list:
-                if is_free:
+            for connection in self.connections_list:
+                if connection.in_use == False:
+                    connection.in_use = True
                     self.connections_in_use_list.append(connection)
-                    self.connections_list.remove([connection, is_free])
+                    self.connections_list.remove(connection)
                     return connection
             if len(self.connections_list) < self.max_number_of_connections \
                     and len(self.connections_list) + len(self.connections_in_use_list) < self.max_number_of_connections:
-                new_connection = self.connection_to_db()
+                new_connection = Connection()
+                new_connection.in_use = True
                 self.connections_in_use_list.append(new_connection)
                 return new_connection
             else:
@@ -56,8 +54,9 @@ class ConnectionPool:
         self.lock.acquire()
         try:
             if connection in self.connections_in_use_list:
+                connection.in_use = False
                 self.connections_in_use_list.remove(connection)
-                self.connections_list.append([connection, True])
+                self.connections_list.append(connection)
         finally:
             self.lock.release()
 
@@ -67,18 +66,18 @@ class ConnectionPool:
             for connection in self.connections_list:
                 if len(self.connections_list) > 11:
                     connection.close()
-                    self.connections_list.remove([connection, True])
+                    self.connections_list.remove(connection)
                     if len(self.connections_list) == 10:
                         break
         except:
             self.lock.release()
 
     def keep_connections_at_the_starting_level(self):
-        if self.connections_list < self.min_number_of_connections:
+        if len(self.connections_list) < self.min_number_of_connections:
             for _ in self.connections_list:
-                connection = self.connection_to_db()
-                self.connections_list.append([connection, True])
-                if self.connections_list == self.min_number_of_connections:
+                connection = Connection()
+                self.connections_list.append(connection)
+                if len(self.connections_list) == self.min_number_of_connections:
                     break
 
     def connections_manager(self):
@@ -87,10 +86,9 @@ class ConnectionPool:
 
     def test_query(self):
         connection = self.get_connection()
-        cursor = connection.cursor()
         query = '''SELECT * FROM users'''
-        cursor.execute(query)
-        result = cursor.fetchall()
+        connection.cursor.execute(query)
+        result = connection.cursor.fetchall()
         print(result)
         self.release_connection(connection)
 
