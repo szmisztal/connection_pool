@@ -84,16 +84,7 @@ class ConnectionPool:
         schedule.every(1).minute.do(self.destroy_unused_connections)
         schedule.every(1).minute.do(self.keep_connections_at_the_starting_level)
 
-    def test_query(self):
-        connection = self.get_connection()
-        query = '''SELECT * FROM users'''
-        connection.cursor.execute(query)
-        result = connection.cursor.fetchall()
-        print(result)
-        self.release_connection(connection)
 
-test = ConnectionPool(10, 100)
-test.test_query()
 
 
 
