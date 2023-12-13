@@ -1,7 +1,7 @@
 import psycopg2
 import schedule
 from threading import Lock
-from test_variables import user, password, host, port, database_name
+from variables import user, password, host, port, database_name
 
 class Connection:
     def __init__(self):
