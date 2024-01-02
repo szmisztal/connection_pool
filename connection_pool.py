@@ -55,8 +55,8 @@ class ConnectionPool:
         try:
             if connection in self.connections_in_use_list:
                 connection.in_use = False
-                self.connections_in_use_list.remove(connection)
                 self.connections_list.append(connection)
+                self.connections_in_use_list.remove(connection)
         finally:
             self.lock.release()
 
@@ -69,7 +69,7 @@ class ConnectionPool:
                     self.connections_list.remove(connection)
                     if len(self.connections_list) == 10:
                         break
-        except:
+        finally:
             self.lock.release()
 
     def keep_connections_at_the_starting_level(self):
